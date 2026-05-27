@@ -1,23 +1,16 @@
 #!/bin/bash
 
-################################################################################
-# Script: simple-rebuild.sh
-# Fungsi: Menghapus semua paket (Nginx, PHP, MySQL, Pterodactyl, dll)
-#         Mengembalikan VPS ke keadaan seperti baru install Ubuntu
-# Support: Ubuntu 22.04 & 24.04
-################################################################################
 
-# Warna
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Log file
+
 LOG_FILE="/var/log/rebuild-$(date +%Y%m%d-%H%M%S).log"
 
-# Banner
+
 echo -e "${GREEN}"
 echo "=============================================="
 echo "     SIMPLE VPS REBUILD SCRIPT v2.0"
@@ -25,7 +18,7 @@ echo "     Menghapus Semua Paket & Konfigurasi"
 echo "=============================================="
 echo -e "${NC}"
 
-# Peringatan
+
 echo -e "${RED}⚠️  PERINGATAN! Script ini akan:${NC}"
 echo "  ❌ Menghapus Nginx, Apache, PHP, MySQL, MariaDB"
 echo "  ❌ Menghapus Pterodactyl Panel & Wings"
@@ -46,14 +39,12 @@ echo ""
 echo -e "${GREEN}Memulai proses rebuild...${NC}"
 echo ""
 
-# Function untuk logging
+
 log() {
     echo -e "${GREEN}[$(date '+%H:%M:%S')]${NC} $1" | tee -a "$LOG_FILE"
 }
 
-# ============================================
-# 1. STOP ALL SERVICES
-# ============================================
+
 log "Menghentikan semua service..."
 
 services="nginx apache2 mysql mariadb php8.1-fpm php8.2-fpm php8.3-fpm redis-server supervisor docker pterodactyl-wings wings cron"
@@ -66,62 +57,56 @@ for service in $services; do
     fi
 done
 
-# Kill proses yang tersisa
+
 pkill -f "pterodactyl" 2>/dev/null
 pkill -f "wings" 2>/dev/null
 pkill -f "nginx" 2>/dev/null
 pkill -f "mysql" 2>/dev/null
 
-# ============================================
-# 2. HAPUS PTERODACTYL USER
-# ============================================
+
 log "Menghapus user pterodactyl..."
 if id "pterodactyl" &>/dev/null; then
     userdel -r pterodactyl 2>/dev/null
     log "  ✓ User pterodactyl dihapus"
 fi
 
-# ============================================
-# 3. PURGE ALL PACKAGES
-# ============================================
+
 log "Menghapus semua paket..."
 
-# Web server
+
 log "  Menghapus Nginx & Apache..."
 apt purge --auto-remove -y nginx nginx-common nginx-core apache2 apache2-utils 2>/dev/null
 
-# PHP dan ekstensi
+
 log "  Menghapus PHP..."
 apt purge --auto-remove -y php* php8.* php7.* libapache2-mod-php* 2>/dev/null
 
-# Database
+
 log "  Menghapus MySQL & MariaDB..."
 apt purge --auto-remove -y mysql-server mysql-client mysql-common mariadb-server mariadb-client 2>/dev/null
 
-# Pterodactyl terkait
+
 log "  Menghapus Pterodactyl..."
 apt purge --auto-remove -y pterodactyl* wings* 2>/dev/null
 
-# Docker
+
 log "  Menghapus Docker..."
 apt purge --auto-remove -y docker docker-engine docker.io containerd runc docker-compose 2>/dev/null
 
-# Tools terkait
+
 log "  Menghapus tools terkait..."
 apt purge --auto-remove -y redis-server supervisor certbot nodejs npm composer redis-tools 2>/dev/null
 
-# Hapus snap packages
+
 log "  Menghapus snap packages..."
 snap list --all 2>/dev/null | awk 'NR>1 {print $1}' | while read snap_name; do
     snap remove --purge "$snap_name" 2>/dev/null
 done
 
-# Hapus snapd
+
 apt purge --auto-remove -y snapd 2>/dev/null
 
-# ============================================
-# 4. HAPUS SEMUA DIREKTORI
-# ============================================
+
 log "Menghapus direktori dan file..."
 
 directories=(
@@ -158,7 +143,7 @@ for dir in "${directories[@]}"; do
     fi
 done
 
-# Hapus konfigurasi user
+
 for user_home in /home/* /root; do
     if [[ -d "$user_home" ]]; then
         rm -rf "$user_home/.composer" 2>/dev/null
@@ -167,36 +152,32 @@ for user_home in /home/* /root; do
     fi
 done
 
-# ============================================
-# 5. BERSIHKAN SISTEM
-# ============================================
+
 log "Membersihkan sistem..."
 
-# Bersihkan apt
+
 apt autoremove --purge -y
 apt autoclean
 apt clean
 
-# Bersihkan log
+
 find /var/log -type f -name "*.log" -exec truncate -s 0 {} \;
 journalctl --rotate
 journalctl --vacuum-time=1s
 
-# Bersihkan temporary
+
 rm -rf /tmp/*
 rm -rf /var/tmp/*
 
-# Hapus swap
+
 swapoff -a 2>/dev/null
 rm -f /swapfile 2>/dev/null
 sed -i '/swapfile/d' /etc/fstab 2>/dev/null
 
-# ============================================
-# 6. RESET KONFIGURASI KE DEFAULT
-# ============================================
+
 log "Meriset konfigurasi ke default..."
 
-# Reset UFW firewall
+
 ufw --force disable 2>/dev/null
 ufw --force reset 2>/dev/null
 ufw default deny incoming 2>/dev/null
@@ -205,7 +186,7 @@ ufw allow 22/tcp 2>/dev/null
 echo "y" | ufw enable 2>/dev/null
 log "  ✓ Firewall reset (SSH port 22 open)"
 
-# Reset hosts file
+
 cat > /etc/hosts << EOF
 127.0.0.1 localhost
 127.0.1.1 $(hostname)
@@ -218,19 +199,17 @@ ff02::2 ip6-allrouters
 EOF
 log "  ✓ Hosts file reset"
 
-# Reset SSH (reinstall)
+
 apt install --reinstall -y openssh-server 2>/dev/null
 systemctl restart ssh
 log "  ✓ SSH reset"
 
-# ============================================
-# 7. INSTALL ULANG PAKET DASAR
-# ============================================
+
 log "Menginstall paket dasar..."
 
 apt update
 
-# Paket minimal yang diperlukan
+
 apt install -y \
     curl \
     wget \
@@ -250,13 +229,11 @@ apt install -y \
 
 log "  ✓ Paket dasar terinstall"
 
-# Setup fail2ban
+
 systemctl enable fail2ban 2>/dev/null
 systemctl start fail2ban 2>/dev/null
 
-# ============================================
-# 8. VERIFIKASI
-# ============================================
+
 log "Verifikasi hasil cleanup..."
 
 echo ""
